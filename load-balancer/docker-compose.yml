@@ -1,0 +1,150 @@
+services:
+  proxy:
+    image: nginx
+    volumes:
+    - ./templates:/etc/nginx/templates
+    - ./root:/var/www/html
+    - ./nginx.conf:/etc/nginx/nginx.conf
+    networks:
+      DMZ:
+        ipv4_address: 192.168.0.11
+      proxy-externo:  
+    ports:
+    - "80:80"
+    - "9001:9001"
+    env_file:
+      - .env
+    depends_on:
+      graylog:
+        condition: "service_started"
+  # Pilha do graylog      
+  mongodb:
+    image: "mongo:5.0"
+    networks:
+      DMZ:
+        ipv4_address: 192.168.0.9
+    volumes:
+      - "mongodb_data:/data/db"
+    restart: "on-failure"
+
+  opensearch:
+    image: "opensearchproject/opensearch:2.4.0"
+    environment:
+      - "OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g"
+      - "bootstrap.memory_lock=true"
+      - "discovery.type=single-node"
+      - "action.auto_create_index=false"
+      - "plugins.security.ssl.http.enabled=false"
+      - "plugins.security.disabled=true"
+    ulimits:
+      memlock:
+        hard: -1
+        soft: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    networks:
+      DMZ:
+        ipv4_address: 192.168.0.10    
+    volumes:
+      - "os_data:/usr/share/opensearch/data"
+    restart: "on-failure"
+
+  graylog:
+    hostname: "server"
+    image: "${GRAYLOG_IMAGE:-graylog/graylog:5.0}"
+    depends_on:
+      opensearch:
+        condition: "service_started"
+      mongodb:
+        condition: "service_started"
+    entrypoint: "/usr/bin/tini -- wait-for-it opensearch:9200 --  /docker-entrypoint.sh"
+    environment:
+      GRAYLOG_NODE_ID_FILE: "/usr/share/graylog/data/config/node-id"
+      GRAYLOG_PASSWORD_SECRET: "${GRAYLOG_PASSWORD_SECRET:?Please configure GRAYLOG_PASSWORD_SECRET in the .env file}"
+      GRAYLOG_ROOT_PASSWORD_SHA2: "${GRAYLOG_ROOT_PASSWORD_SHA2:?Please configure GRAYLOG_ROOT_PASSWORD_SHA2 in the .env file}"
+      GRAYLOG_HTTP_BIND_ADDRESS: "0.0.0.0:9000"
+      GRAYLOG_HTTP_EXTERNAL_URI: "http://localhost:9000/"
+      GRAYLOG_ELASTICSEARCH_HOSTS: "http://opensearch:9200"
+      GRAYLOG_MONGODB_URI: "mongodb://mongodb:27017/graylog"
+    ports:
+    - "5044:5044/tcp"   # Beats
+    - "5140:5140/udp"   # Syslog
+    - "5140:5140/tcp"   # Syslog
+    - "5555:5555/tcp"   # RAW TCP
+    - "5555:5555/udp"   # RAW TCP
+    - "9002:9000/tcp"   # Server API
+    - "12201:12201/tcp" # GELF TCP
+    - "12201:12201/udp" # GELF UDP
+    #- "10000:10000/tcp" # Custom TCP port
+    #- "10000:10000/udp" # Custom UDP port
+    - "13301:13301/tcp" # Forwarder data
+    - "13302:13302/tcp" # Forwarder config
+    networks:
+      DMZ:
+        ipv4_address: 192.168.0.8
+        
+    volumes:
+      - "graylog_data:/usr/share/graylog/data/data"
+      - "graylog_journal:/usr/share/graylog/data/journal"
+    restart: "on-failure"
+
+  dvwa:
+    build: 
+      context: ./dvwa
+    environment:
+      - DB_SERVER=db
+    depends_on:
+      - db
+    #volumes:
+    #- ./dvwa/default-ssl.conf:/etc/apache2/sites-available/default-ssl.conf   
+    ports:
+    - 8081:80
+    - 443:443  
+    networks:
+      DMZ:
+        ipv4_address: 192.168.0.12  
+    # command: systemctl restart apache2.service
+  db:
+    image: docker.io/library/mariadb:10
+    env_file:
+      - .env
+    volumes:
+       - data:/var/lib/mysql
+    networks:
+      DMZ:
+        ipv4_address: 192.168.0.13              
+  phpmyadmin:
+    image: phpmyadmin
+    depends_on:
+      - db
+    ports:
+      - 8080:80
+    environment:
+      - PMA_ARBITRARY=1
+    networks:
+      DMZ:
+        ipv4_address: 192.168.0.14    
+volumes:
+  mongodb_data:
+  os_data:
+  graylog_data:
+  graylog_journal:
+  data:
+networks:
+  proxy-externo:
+    name: "proxy-externo"
+  DMZ:
+    ipam:
+      driver: default
+      config:
+        - subnet:   192.168.0.0/24
+          ip_range: 192.168.0.0/24
+          gateway: 192.168.0.254
+          aux_addresses:
+            host1: 192.168.0.5
+            host2: 192.168.0.6
+            host3: 192.168.0.7
+      options:
+        foo: bar
+        baz: "0"  

@@ -1,0 +1,92 @@
+upstream docker-graylog {
+        server graylog:9000;
+}
+
+upstream docker-graylog-1 {
+        server 192.168.0.8:9000;
+}
+proxy_set_header   Host $host;
+proxy_set_header   X-Real-IP $remote_addr;
+proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+proxy_set_header   X-Forwarded-Host $server_name;
+add_header 'Access-Control-Allow-Origin' *;
+server {
+        listen ${NGINX_PORT};
+        server_name  ${NGINX_HOST};
+
+        location / {            
+                root ${NGINX_ROOT};
+        }
+        error_page 400 401 404 /errors/error.html;
+
+        location /dvwa {        
+                proxy_pass http://192.168.0.12/;
+        }
+
+        location /phpmyadmin{        
+                proxy_pass http://192.168.0.14/;
+        }
+
+        location /graylog {
+                proxy_pass http://graylog:9000/;
+        } 
+
+        location /graylog1 {
+                proxy_pass http://graylog:9000/;
+                proxy_redirect http://graylog:9000/ $scheme://$host:80/;      
+        }
+
+        location /graylog2 {
+                proxy_pass  http://localhost:9000/;
+                proxy_redirect http://localhost:9000/ $scheme://$host:80/;  
+        }
+
+        location /graylog3 {
+                proxy_pass http://192.168.0.8:9000/;
+                proxy_redirect http://192.168.0.8:9000/ $scheme://$host:80/;     
+        } 
+
+        location /graylog4 {
+                #tela em branco com strict-origin-when-cross-origin
+                proxy_pass http://192.168.0.8:9000/;   
+        } 
+
+        location /graylog5 {
+                #502 bad gateway
+                proxy_pass http://localhost:9000/;   
+        } 
+
+        location /graylog6 {
+                #504 gateway timeout 
+                proxy_pass http://172.0.0.1:9000/;   
+        }
+
+        location /graylog7 {
+                proxy_pass http://docker-graylog; 
+                proxy_redirect     off;  
+        }      
+
+        location /graylog8 {
+                proxy_pass http://docker-graylog-1; 
+                proxy_redirect     off;  
+        }
+
+        location /graylog9 {
+                proxy_pass http://localhost:9001; 
+        }   
+}
+
+server {
+        listen 9001;
+        server_name  ${NGINX_HOST};
+        location /{        
+                #proxy_pass http://192.168.0.12/;
+                proxy_pass http://graylog:9000/;
+        }
+
+        location /graylog{        
+                proxy_pass http://graylog:9000/;
+        }
+}
+
+
