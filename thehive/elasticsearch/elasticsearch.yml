@@ -1,0 +1,8 @@
+http.host: 127.0.0.1
+transport.host: 127.0.0.1
+cluster.name: hive
+thread_pool.search.queue_size: 100000
+path.logs: "/var/log/elasticsearch"
+path.data: "/var/lib/elasticsearch"
+xpack.security.enabled: false
+script.allowed_types: "inline,stored"

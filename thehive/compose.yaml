@@ -1,0 +1,40 @@
+version: "3"
+services:
+  thehive:
+    image: alv/thehive:5.2
+    depends_on:
+      - cassandra
+      - elasticsearch
+    mem_limit: 1500m
+    ports:
+      - "9000:9000"
+    environment:
+      - JVM_OPTS="-Xms1024M -Xmx1024M"
+    
+  cassandra:
+    image: 'alv/cassandra:4'
+    mem_limit: 1600m
+    ports:
+      - "9042:9042"
+    environment:
+      - MAX_HEAP_SIZE=1024M
+      - HEAP_NEWSIZE=1024M
+      - CASSANDRA_CLUSTER_NAME=TheHive
+    volumes:
+      - cassandradata:/var/lib/cassandra
+    restart: on-failure
+
+  elasticsearch:
+    image: alv/elasticsearch:7
+    mem_limit: 1500m
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    volumes:
+      - elasticsearchdata:/usr/share/elasticsearch/data
+
+volumes:
+  cassandradata:
+  elasticsearchdata:

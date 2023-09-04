@@ -3,6 +3,7 @@
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
+use Monolog\Handler\GelfHandler;
 use Monolog\Processor\PsrLogMessageProcessor;
 
 return [
@@ -18,7 +19,7 @@ return [
     |
     */
 
-    'default' => env('LOG_CHANNEL', 'stack'),
+    'default' => env('LOG_CHANNEL', 'graylog'),
 
     /*
     |--------------------------------------------------------------------------
@@ -52,6 +53,15 @@ return [
     */
 
     'channels' => [
+        'graylog' => [
+            'driver'  => 'monolog',
+            'handler' => Monolog\Handler\GelfHandler::class,
+            'with' => [
+                'host' => 'localhost',
+                'port' => '9000',
+            ]
+        ],
+
         'stack' => [
             'driver' => 'stack',
             'channels' => ['single'],
